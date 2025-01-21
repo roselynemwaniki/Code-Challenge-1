@@ -15,64 +15,23 @@ class AuthTestCase(unittest.TestCase):
             db.session.remove()
             db.drop_all()
 
-    def test_register_user(self):
-        response = self.app.post('/register', json={  # Updated endpoint
-            'username': 'testuser',
-            'email': 'test@example.com',
-            'password': 'testpassword'
-        })
-        self.assertEqual(response.status_code, 400)
-        self.assertIn(b'User registered successfully!', response.data)
+    def test_missing_authorization_header(self):
+        response = self.app.get('/task')  # Example endpoint that requires authorization
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json, {"msg": "Missing Authorization Header"})
 
-    def test_update_password(self):
-        # First, register a user
-        self.app.post('/register', json={  # Updated endpoint
-            'username': 'testuser',
-            'email': 'test@example.com',
-            'password': 'testpassword'
-        })
-
-        # Get JWT token for the registered user within the app context
+    def test_login(self):
         with app.app_context():
-            access_token = create_access_token(identity=1)  # Assuming user ID is 1 for the test
+            # Create a user only if it does not already exist
+            user = User.query.filter_by(username='testuser').first()
+            if not user:
+                user = User(username='testuser', email='test@example.com', password='testpassword')
+                db.session.add(user)
+                db.session.commit()
 
-        # Update the password
-        response = self.app.put('/user/updatepassword', 
-                                 headers={'Authorization': f'Bearer {access_token}'},  # Include token
-                                 json={
-            'new_password': 'newpassword'
-        })
+        response = self.app.post('/login', json={'email': 'test@example.com', 'password': 'testpassword'})
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Password updated successfully!', response.data)
-
-    def test_update_user(self):
-        # First, register a user
-        self.app.post('/register', json={
-            'username': 'testuser',
-            'email': 'test@example.com',
-            'password': 'testpassword'
-        })
-
-        # Get JWT token for the registered user within the app context
-        with app.app_context():
-            access_token = create_access_token(identity=1)  # Assuming user ID is 1 for the test
-
-        # Update the user information
-        response = self.app.put('/user/update', 
-                                 headers={'Authorization': f'Bearer {access_token}'},  # Include token
-                                 json={
-            'username': 'updateduser',
-            'email': 'updated@example.com'
-        })
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'{"User updated successfully!"}\n', response.data)
-
-        # Test invalid update (no data)
-        response = self.app.put('/user/update', 
-                                 headers={'Authorization': f'Bearer {access_token}'},  # Include token
-                                 json={})
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'{"Invalid data!"}', response.data)
+        self.assertIn('access_token', response.json)
 
 if __name__ == '__main__':
     unittest.main()

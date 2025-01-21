@@ -1,12 +1,17 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, Task
 
 task_bp = Blueprint('task', __name__)
 
+def check_authorization():
+    if not request.headers.get('Authorization'):
+        return jsonify({"message": "Missing Authorization Header"}), 401
+
 @task_bp.route('', methods=['POST'])
 @jwt_required()
 def create_task():
+    check_authorization()
     data = request.get_json()
     if not data or 'title' not in data or 'user_id' not in data:
         return jsonify({"message": "Missing required fields!"}), 400
@@ -24,6 +29,7 @@ def create_task():
 @task_bp.route('', methods=['GET'])
 @jwt_required()
 def get_tasks():
+    check_authorization()
     tasks = Task.query.all()
     return jsonify([{
         "id": task.id,
@@ -35,6 +41,7 @@ def get_tasks():
 @task_bp.route('/<int:task_id>', methods=['PUT'])
 @jwt_required()
 def update_task(task_id):
+    check_authorization()
     task = Task.query.get(task_id)
     if not task:
         return jsonify({"message": "Task not found!"}), 404
@@ -48,6 +55,7 @@ def update_task(task_id):
 @task_bp.route('/<int:task_id>', methods=['DELETE'])
 @jwt_required()
 def delete_task(task_id):
+    check_authorization()
     task = Task.query.get(task_id)
     if not task:
         return jsonify({"message": "Task not found!"}), 404
